@@ -26,6 +26,14 @@ Alternatives Considered → Test Contract → References.
 | [ADR-0003](./ADR-0003-trace-driven-harness-optimization.md) | Trace-driven harness optimization with held-out promotion gates | Proposed |
 
 | [ADR-0107](./ADR-0107-ruos-evaluation-boundary.md) | Independent ruOS evaluation boundary | Implemented for compiler and receipt contract; external controllers required |
+| [ADR-0108](./ADR-0108-mandatory-research-cycle-adrs.md) | Always record decisions and every research cycle in ADRs | Accepted user policy |
+
+## Daily research decisions
+
+[Research-cycle ADR index](./research/INDEX.md) lists local dated ADRs generated
+by the controller. Every cycle gets one, including rejected, inconclusive,
+blocked and speculative cycles. These use stable date-based IDs and a separate
+index, leaving the numbered architecture series intact. See ADR-0108.
 
 ## How to amend
 

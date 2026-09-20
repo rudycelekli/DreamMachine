@@ -161,8 +161,9 @@ function step06Budget(ledgerPath: string): string {
 
 Set a budget before research: research < half the total; evaluation bounded by
 the STEP 12 caps; a hard ceiling that stops adding work when effort runs long.
-The one invariant that survives budget pressure: STEP 25 (ledger update) always
-happens. A forced stop is recorded as \`HALT: budget\` in \`${ledgerPath}\`.`;
+The invariants that survive budget pressure: STEP 19 (ADR) and STEP 25 (ledger
+update) always happen. A forced stop is recorded in the ADR and as
+\`HALT: budget\` in \`${ledgerPath}\`.`;
 }
 
 function step1Ledger(ledgerPath: string): string {
@@ -345,11 +346,24 @@ function step19Adr(adrDir: string, pad: number): string {
   const example = `ADR-${'0'.repeat(Math.max(0, pad - 1))}N`;
   return `# STEP 19: ADR DECISION
 
-Create an ADR only if tonight's result is an architectural decision (never for
-parameter changes, benchmark additions, docs, or minor prompt/routing tweaks).
-Search the existing ADRs first. Determine the next number from the repo (do not
-assume). Path: \`${adrDir}/${example}-dream-cycle-<surface>-<slug>.md\` using ${pad}-digit padding.
-Follow the repo's own ADR shape; Status starts \`Proposed\`; add the INDEX row.`;
+Create an ADR for every cycle, regardless of scope or outcome. This includes
+architecture, minor code changes, parameter changes, benchmark additions, docs,
+prompt/routing tweaks, rejected or inconclusive experiments, speculative fallback
+ideas, source failures, blocked runs, and budget-forced halts. Never skip the ADR
+because no implementation qualified or no architecture changed.
+
+Search the existing ADRs and INDEX first for this cycle's stable run ID (or the
+date and session branch). Resume and update the same ADR on retries; never duplicate it
+or reuse another cycle's ADR. For a new cycle, determine the next number from the
+repo (do not assume). Path: \`${adrDir}/${example}-dream-cycle-<surface>-<slug>.md\` using ${pad}-digit padding.
+Follow the repo's own ADR shape and add exactly one INDEX row for this cycle.
+Record the cycle identity, context, decision, alternatives (including no change),
+precise sources/commits and limitations, evidence/receipt links, consequences,
+durable lesson, and follow-up. Label speculation and missing evidence explicitly.
+Status is \`Proposed\` for an ACCEPT candidate awaiting human review, \`Rejected\`
+for REJECT, \`Inconclusive\` for unresolved evaluation, or \`Deferred\` for abandoned
+or not-attempted work; explain any blocker. Never mark an ADR \`Accepted\`
+automatically: evaluation is not human acceptance.`;
 }
 
 function step20to25PublishFlow(branchPrefix: string, ledgerPath: string, autoMerge: boolean): string {
@@ -383,8 +397,8 @@ Append exactly ONE row to \`${ledgerPath}\`:
 ${LEDGER_SCHEMA}
 \`\`\`
 
-The ledger row is written on every run, even a budget-forced halt. It is the
-only durable cross-night memory. Commit it.`;
+The ledger row and ADR are written on every run, even a budget-forced halt.
+Together they preserve durable cross-night memory. Commit them.`;
 }
 
 function step26SelfReview(): string {
@@ -394,7 +408,9 @@ Verify before completing: current sources? concrete candidate? hypothesis frozen
 before evaluation? fair baseline? real evaluator? receipt preserved? independent
 critic? reward-hack checked? Darwin bounded? failed lineage kept? evidence
 retained? witness from the final gist? no self-promotion? no merge? ledger
-updated? Any "no" is corrected or explicitly reported.`;
+updated? ADR and exactly one INDEX row present for this cycle regardless of
+result, with accurate status, evidence, lesson, and follow-up? Any "no" is
+corrected or explicitly reported; an absent ADR must be created before completion.`;
 }
 
 function stopConditions(): string {
@@ -405,7 +421,8 @@ research sources fail; selected AND substitute surfaces exhausted; the evaluator
 cannot run; corpus corrupted beyond safe repair; candidate would break fair
 comparison; unresolved reward-hacking; witness generation fails. GitHub-auth
 failure is NOT fatal (\`FALLBACK=true\`). Missing model credentials are NOT fatal
-(\`LLM_EVAL=blocked\`).`;
+(\`LLM_EVAL=blocked\`). Every stop still requires a local ADR and INDEX entry
+(STEP 19), a durable lesson, and the ledger update (STEP 25).`;
 }
 
 function finalReport(): string {
@@ -418,7 +435,7 @@ Candidate / Darwin winner / Tests / Main lesson / Biggest uncertainty / Human
 action recommended. Final line, exactly:
 
 \`\`\`text
-Done. Issue #<N or LOCAL>, Gist <URL or LOCAL>, PR #<N or NONE> (evaluated=<yes/no/blocked>, verdict=<ACCEPT/REJECT/INCONCLUSIVE>), ADR-<NNN> or none. Witness: <WITNESS>.
+Done. Issue #<N or LOCAL>, Gist <URL or LOCAL>, PR #<N or NONE> (evaluated=<yes/no/blocked>, verdict=<ACCEPT/REJECT/INCONCLUSIVE>), ADR-<NNN> (<status>, <local path>). Witness: <WITNESS>.
 \`\`\``;
 }
 

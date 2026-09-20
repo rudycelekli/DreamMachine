@@ -125,3 +125,38 @@ test('completion retries restore the lesson after a concurrent memory lock inter
   await lab.finalize(run.id, review, true);
   assert.equal((await lab.verifyRun(run.id)).valid, true);
 });
+test('every blocked cycle gets an ADR and verification enforces its content and index', async t => {
+  const lab = await fixture(t, async () => ({ complete: false, papers: [], sources: [] }));
+  const run = await lab.prepare();
+  const adrPath = join(lab.root, 'docs/adrs/research', `ADR-${run.id}.md`);
+  const indexPath = join(lab.root, 'docs/adrs/research/INDEX.md');
+  assert.match(await readFile(adrPath, 'utf8'), /Draft/);
+  await lab.finalize(run.id, { lesson: 'The source was blocked; record the missing observation and retry discovery tomorrow.' }, true);
+  assert.match(await readFile(adrPath, 'utf8'), /Inconclusive/);
+  const originalWitness = await readFile(join(run.runDir, 'witness.json'), 'utf8');
+  await writeFile(adrPath, 'An unverified replacement decision.');
+  assert.equal((await lab.verifyRun(run.id)).valid, false);
+  await lab.repair(run.id);
+  await rm(indexPath);
+  assert.equal((await lab.verifyRun(run.id)).valid, false);
+  await lab.repair(run.id);
+  await rm(adrPath);
+  assert.equal((await lab.verifyRun(run.id)).valid, false);
+  await lab.repair(run.id);
+  assert.equal((await lab.verifyRun(run.id)).valid, true);
+  assert.equal(await readFile(join(run.runDir, 'witness.json'), 'utf8'), originalWitness);
+  assert.equal((await readFile(indexPath, 'utf8')).split('\n').filter(line => line.includes(`](ADR-${run.id}.md)`)).length, 1);
+});
+test('ADR write failure prevents successful completion and a retry repairs it', async t => {
+  const lab = await fixture(t, async () => ({ complete: true, papers: [], sources: [] }));
+  const run = await lab.prepare();
+  const adrPath = join(lab.root, 'docs/adrs/research', `ADR-${run.id}.md`);
+  await rm(adrPath);
+  await mkdir(adrPath);
+  const review = { lesson: 'An interrupted ADR write must be repaired before reporting this cycle complete.' };
+  await assert.rejects(lab.finalize(run.id, review, true));
+  assert.notEqual((await lab.load(run.id)).materialized, true);
+  await rm(adrPath, { recursive: true });
+  await lab.finalize(run.id, review, true);
+  assert.equal((await lab.verifyRun(run.id)).valid, true);
+});

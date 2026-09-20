@@ -6,6 +6,7 @@ coverage/
 .env
 .dream/
 reports/research/
+docs/adrs/research/
 .metaharness/
 .claude-flow/
 .swarm/

@@ -23,3 +23,13 @@ part of a routine. ACCEPT means ready for human review.
 Validate changes with `npm run check` (includes research integration tests).
 Use pinned dependencies. Record the precise source, commit and limitations.
 Each daily cycle must finish or abandon with a durable lesson, then verify.
+
+Always create or update an ADR for decisions in this project, including small
+changes, documentation, rejected/inconclusive experiments and speculative ideas.
+Every daily cycle has a mandatory ADR from preparation through completion at
+`docs/adrs/research/ADR-YYYY-MM-DD.md`, maintained and verified by the controller.
+Do not skip an ADR because a change is minor, no useful paper is found, a source
+is unavailable, or an experiment fails. Record context, alternatives, decision,
+evidence, consequences and next steps; ACCEPT is Proposed pending human review.
+For changes to the loop itself, add a numbered ADR under `docs/adrs/` and update
+its index. See ADR-0108. Missing or changed cycle ADRs fail verification.

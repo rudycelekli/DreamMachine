@@ -4,6 +4,8 @@ This checkout combines the actual [Dream Machine engine](https://github.com/ruvn
 with native [RuVector](https://github.com/ruvnet/RuVector). The daily Codex task
 provides the researcher, implementer and independent critic. The local CLI
 provides discovery, memory, isolation, measurement, evidence and reports.
+Every cycle also has a mandatory ADR, including small changes, failed or blocked
+experiments and speculative ideas; see [ADR-0108](adrs/ADR-0108-mandatory-research-cycle-adrs.md).
 Running `prepare` alone does not implement code: the scheduled agent follows
 the generated instructions to complete the cycle.
 
@@ -150,6 +152,14 @@ witness JSON and `LEDGER.md` preserve history. Raw source records, hypotheses,
 worktrees, patches and logs live in `.dream/research/`. All are local and ignored
 by Git to avoid contaminating future baseline snapshots. Back up these directories
 if the machine is replaced. No public issues, gists or PRs are created.
+The controller creates `docs/adrs/research/ADR-YYYY-MM-DD.md` during preparation
+and updates it through freezing, evaluation and completion. The separate
+[ADR index](adrs/research/INDEX.md) links every cycle's context, decision,
+alternatives, evidence, consequences and next steps. ACCEPT remains Proposed
+pending human review; REJECT and INCONCLUSIVE receive their own explicit status.
+Missing or changed ADRs or index entries fail `verify`. Cycle ADRs and their
+index are local generated artifacts, ignored by Git so updates do not dirty the
+baseline. Back them up together with reports and `.dream/research/`.
 Use `repair YYYY-MM-DD` only to rebuild derived reports/ledger/memory after an
 interrupted completion. It is not a way to repair modified experimental evidence.
 

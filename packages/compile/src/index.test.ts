@@ -148,6 +148,48 @@ describe('compile', () => {
     expect(prompt).toContain('3-digit padding');
   });
 
+  it('requires ADRs for nonarchitectural, speculative, rejected, and blocked cycles', () => {
+    const adrStep = prompt.split('# STEP 19:')[1].split('# STEP 20')[0];
+    expect(adrStep).toContain('Create an ADR for every cycle, regardless of scope or outcome.');
+    for (const scenario of [
+      'minor code changes', 'parameter changes', 'benchmark additions', 'docs',
+      'prompt/routing tweaks', 'rejected or inconclusive experiments',
+      'speculative fallback', 'source failures', 'blocked runs', 'budget-forced halts',
+    ]) {
+      expect(adrStep).toContain(scenario);
+    }
+    expect(adrStep).not.toContain('only if');
+    expect(prompt).not.toContain('never for\nparameter changes');
+    expect(prompt).toContain('STEP 19 (ADR) and STEP 25 (ledger\nupdate) always happen');
+    const stopConditions = prompt.split('# STOP CONDITIONS')[1].split('# FINAL REPORT')[0];
+    expect(stopConditions).toContain('Every stop still requires a local ADR and INDEX entry');
+    const selfReview = prompt.split('# STEP 26:')[1].split('# STOP CONDITIONS')[0];
+    expect(selfReview).toContain('an absent ADR must be created before completion');
+  });
+
+  it('keeps cycle ADRs idempotent, evidenced, and subject to human acceptance', () => {
+    const adrStep = prompt.split('# STEP 19:')[1].split('# STEP 20')[0];
+    expect(adrStep).toContain('stable run ID');
+    expect(adrStep).toContain('Resume and update the same ADR on retries');
+    expect(adrStep).toContain("never duplicate it\nor reuse another cycle's ADR");
+    expect(adrStep).toContain('add exactly one INDEX row for this cycle');
+    for (const requirement of [
+      'context', 'decision', 'alternatives (including no change)',
+      'precise sources/commits and limitations', 'evidence/receipt links',
+      'consequences', 'durable lesson', 'follow-up',
+    ]) {
+      expect(adrStep).toContain(requirement);
+    }
+    expect(adrStep).toContain('`Proposed` for an ACCEPT candidate awaiting human review');
+    expect(adrStep).toContain('`Rejected`\nfor REJECT');
+    expect(adrStep).toContain('`Inconclusive` for unresolved evaluation');
+    expect(adrStep).toContain('`Deferred` for abandoned\nor not-attempted work');
+    expect(adrStep).toContain('Never mark an ADR `Accepted`\nautomatically');
+    const finalReport = prompt.split('# FINAL REPORT')[1].split('# FINAL OPERATING PRINCIPLE')[0];
+    expect(finalReport).toContain('ADR-<NNN> (<status>, <local path>)');
+    expect(finalReport).not.toMatch(/ADR[^\n]*\bor none\b/);
+  });
+
   it('carries the load-bearing invariants verbatim', () => {
     expect(prompt).toContain('ACCEPT | REJECT | INCONCLUSIVE');
     expect(prompt).toContain('evaluation is not promotion');

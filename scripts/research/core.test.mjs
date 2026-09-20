@@ -57,6 +57,9 @@ test('complete cycle persists a witnessed report, one ledger row, memory and dai
   assert.equal(ledger.trim().split('\n').length, 3);
   const recall = await lab.recall('implementation oracle');
   assert(recall.hits.some(h => h.kind === 'experiment'));
+  const emptyQuery = await lab.recall('');
+  assert.equal(emptyQuery.hits.length, 0);
+  assert.equal(emptyQuery.recentLessons[0].id, `experiment:${prepared.id}`);
   assert((await readFile(join(prepared.runDir, 'DREAM-REFERENCE.md'), 'utf8')).includes('STEP 26'));
   await writeFile(join(prepared.runDir, 'REPORT.md'), 'tampered');
   assert.equal((await lab.verifyRun(prepared.id)).valid, false);

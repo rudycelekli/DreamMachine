@@ -127,7 +127,7 @@ export async function openLab(root, { discover = discoverPapers } = {}) {
       if (digest(record) !== digest(known.get(paper.id) || null)) await store.upsert(record);
     }
     run.memory = store.status();
-    await atomic(join(runPath(run.id), 'memory.json'), { status: run.memory, hits: run.recalled, signals: run.signals });
+    await atomic(join(runPath(run.id), 'memory.json'), { status: run.memory, hits: run.recalled, recentLessons: run.recentLessons || [], signals: run.signals });
     run.status = 'prepared';
     run.preparationComplete = true;
     await save(run);
@@ -164,7 +164,9 @@ export async function openLab(root, { discover = discoverPapers } = {}) {
           baseCommit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
           configDigest: digest(config), runtime: `Node ${process.version}; ${process.platform}/${process.arch}`, surface, mode: researchMode(discovery, papers),
           papers, sources: discovery.sources, discoveryComplete: discovery.complete,
-          memory: store.status(), recalled, signals: learningSignals(priorRows, { today: id }),
+          memory: store.status(), recalled,
+          recentLessons: store.list().filter(record => record.kind === 'experiment').slice(-7).reverse(),
+          signals: learningSignals(priorRows, { today: id }),
         };
         await mkdir(runPath(id), { recursive: true });
         await save(run);
@@ -310,7 +312,10 @@ export async function openLab(root, { discover = discoverPapers } = {}) {
   }
   async function recall(query) {
     const store = await memory();
-    try { const hits = await store.search(query, { limit: 8 }); return { status: store.status(), hits }; } finally { await store.close(); }
+    try {
+      const hits = await store.search(query, { limit: 8 });
+      return { status: store.status(), hits, recentLessons: store.list().filter(record => record.kind === 'experiment').slice(-7).reverse() };
+    } finally { await store.close(); }
   }
   async function repair(id) {
     return locked(async () => { const run = await load(id); assert(run.status === 'complete', 'Only completed runs can rebuild derived artifacts'); await materialize(run); run.materialized = true; await save(run); return verifyRun(id); });

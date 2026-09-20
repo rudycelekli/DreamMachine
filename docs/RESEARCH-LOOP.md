@@ -178,6 +178,9 @@ change reaches the target branch. Research memory advances after every cycle.
   Backend status clearly reports a lexical fallback if the native package fails.
 - Selection: explicit ID deduplication, local lexical relevance and prior-result
   retrieval assist the AI's judgment. No heuristic score proves scientific novelty.
+  Each recall/preparation also includes the last seven experiment lessons
+  separately from ranked vector hits, so abundant paper records cannot crowd
+  recent rejections out of the next cycle's context.
 - Source parser: exact `fast-xml-parser@5.11.1`, bounded arXiv retrieval with
   source status and timestamps. Unavailable sources remain explicit failures.
 - Credentials: discovery/memory/evaluation use no paid model API. The scheduled

@@ -4,6 +4,11 @@
 
 # ☾ Dream Machine
 
+> **Local daily research integration:** this checkout adds live paper discovery,
+> persistent native RuVector retrieval, isolated implementation experiments, and
+> witnessed reports. Start with [the research loop guide](docs/RESEARCH-LOOP.md)
+> and `npm run research -- status`. Policy is in `research.config.json`.
+
 **A config-driven engine for nightly, cloud-scheduled, evidence-gated repository evolution.**
 
 [![CI](https://github.com/ruvnet/dream-machine/actions/workflows/ci.yml/badge.svg)](https://github.com/ruvnet/dream-machine/actions/workflows/ci.yml)

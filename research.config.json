@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "name": "DreamMachine research laboratory",
+  "timezone": "America/Toronto",
+  "dailyHour": 7,
+  "maxMinutes": 60,
+  "maxPendingCandidates": 3,
+  "discovery": {
+    "lookbackDays": 7,
+    "maxResults": 60,
+    "query": "(cat:cs.AI OR cat:cs.LG OR cat:cs.CL OR cat:cs.IR) AND (all:agent OR all:memory OR all:retrieval OR all:evaluation)"
+  },
+  "surfaces": [
+    "agent memory and retrieval",
+    "evaluation reliability and reproducibility",
+    "research novelty detection and experiment selection",
+    "bounded search and reasoning efficiency",
+    "adversarial robustness and evidence provenance"
+  ],
+  "memory": { "backend": "auto", "dimensions": 384 },
+  "allowedPaths": ["packages/memory/src/", "packages/ledger/src/", "packages/compile/src/"],
+  "maxChangedLines": 300,
+  "evaluation": { "command": ["npm", "run", "check"], "timeoutSeconds": 600 },
+  "publication": "local-only",
+  "promotion": "human-review"
+}

@@ -5,6 +5,7 @@ coverage/
 .DS_Store
 .env
 .dream/
+reports/research/
 .metaharness/
 .claude-flow/
 .swarm/

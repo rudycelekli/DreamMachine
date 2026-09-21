@@ -1,6 +1,7 @@
 # Dream Machine — ADR Index
 
-Architecture Decision Records for `ruvnet/dream-machine`. Naming convention:
+Architecture Decision Records for `rudycelekli/DreamMachine`, including the
+inherited decisions from `ruvnet/dream-machine`. Naming convention:
 `ADR-NNNN-kebab-case-slug.md` (four-digit padding). Each ADR follows the shape:
 Title / Status / Date / Related → Context → Decision → Consequences →
 Alternatives Considered → Test Contract → References.
@@ -27,6 +28,7 @@ Alternatives Considered → Test Contract → References.
 
 | [ADR-0107](./ADR-0107-ruos-evaluation-boundary.md) | Independent ruOS evaluation boundary | Implemented for compiler and receipt contract; external controllers required |
 | [ADR-0108](./ADR-0108-mandatory-research-cycle-adrs.md) | Always record decisions and every research cycle in ADRs | Accepted user policy |
+| [ADR-0109](./ADR-0109-public-research-repository.md) | Publish the research laboratory on GitHub | Accepted user decision |
 
 ## Daily research decisions
 

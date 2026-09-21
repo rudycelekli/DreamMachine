@@ -6,6 +6,10 @@ provides the researcher, implementer and independent critic. The local CLI
 provides discovery, memory, isolation, measurement, evidence and reports.
 Every cycle also has a mandatory ADR, including small changes, failed or blocked
 experiments and speculative ideas; see [ADR-0108](adrs/ADR-0108-mandatory-research-cycle-adrs.md).
+The public code repository is [rudycelekli/DreamMachine](https://github.com/rudycelekli/DreamMachine).
+GitHub CI validates the code; the AI research schedule runs locally in Codex.
+Raw research artifacts remain local unless separately selected for publication;
+see [ADR-0109](adrs/ADR-0109-public-research-repository.md).
 Running `prepare` alone does not implement code: the scheduled agent follows
 the generated instructions to complete the cycle.
 

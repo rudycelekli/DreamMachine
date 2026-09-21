@@ -21,6 +21,8 @@ permissions:
 
 jobs:
   publish:
+    # Retain the upstream publisher without releasing packages from other repositories.
+    if: ${{ github.repository == 'ruvnet/dream-machine' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

@@ -17,6 +17,8 @@ concurrency:
 
 jobs:
   deploy:
+    # Publishing this research repository does not authorize upstream site hosting.
+    if: ${{ github.repository == 'ruvnet/dream-machine' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

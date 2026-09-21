@@ -36,6 +36,8 @@ concurrency:
 
 jobs:
   dream:
+    # Other repositories use the local research loop; no inherited paid jobs or posting.
+    if: ${{ github.repository == 'ruvnet/dream-machine' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

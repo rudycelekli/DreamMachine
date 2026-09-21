@@ -42,6 +42,8 @@ jobs:
         run: npx vitest run --coverage
       - name: Governance and contract regression tests
         run: npm run test:governance
+      - name: Local research loop integration tests
+        run: npm run test:research
       - name: Validate Edge v1 contracts and mission plan
         run: npm run check:edge-contracts
       - name: Prohibit exposed development test services

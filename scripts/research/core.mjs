@@ -9,6 +9,9 @@ import { discoverPapers } from './discovery.mjs';
 import { openMemory } from './memory.mjs';
 import { freezeExperiment, evaluateExperiment, verifyExperiment } from './experiment.mjs';
 import { writeAdr, verifyAdr } from './adr.mjs';
+import { localDate, scheduledHours, cycleSlot, assertRunId, isRunId, runDate } from './schedule.mjs';
+
+export { localDate } from './schedule.mjs';
 
 export const digest = value => createHash('sha256').update(typeof value === 'string' ? value : JSON.stringify(value)).digest('hex');
 export const json = async path => JSON.parse(await readFile(path, 'utf8'));
@@ -19,9 +22,6 @@ export async function atomic(path, value) {
 }
 const cleanCell = value => String(value ?? '').replace(/[|\r\n]/g, ' ').trim();
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
-export function localDate(now, timezone) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
-}
 export function rankPapers(papers, known, surface) {
   const seen = new Set(known.filter(r => r.kind === 'paper').map(r => r.id));
   const terms = [...new Set((surface + ' agent memory retrieval evaluation').toLowerCase().split(/\W+/).filter(t => t.length > 3))];
@@ -64,17 +64,18 @@ export async function openLab(root, { discover = discoverPapers } = {}) {
   assert(Array.isArray(config.surfaces) && config.surfaces.length, 'At least one research surface is required');
   assert(Number.isInteger(config.maxPendingCandidates) && config.maxPendingCandidates > 0, 'Invalid candidate limit');
   localDate(new Date(), config.timezone);
+  const hours = scheduledHours(config);
   const directory = join(root, '.dream', 'research');
   const runsDir = join(directory, 'runs');
   const reportsDir = join(root, 'reports', 'research');
   await mkdir(runsDir, { recursive: true });
   await mkdir(reportsDir, { recursive: true });
   const runPath = id => {
-    assert(/^\d{4}-\d{2}-\d{2}$/.test(id), 'runId must be YYYY-MM-DD');
+    assertRunId(id);
     return join(runsDir, id);
   };
   async function runs() {
-    const names = (await readdir(runsDir)).filter(n => /^\d{4}-\d{2}-\d{2}$/.test(n)).sort();
+    const names = (await readdir(runsDir)).filter(isRunId).sort();
     const records = await Promise.all(names.map(async n => {
       try { return await json(join(runPath(n), 'run.json')); }
       catch (error) { if (error.code === 'ENOENT') return null; throw error; }
@@ -148,12 +149,16 @@ export async function openLab(root, { discover = discoverPapers } = {}) {
         return { ...active, resumed: true, runDir: runPath(active.id) };
       }
       const now = new Date();
-      const id = localDate(now, config.timezone);
-      const previous = all.find(r => r.id === id);
+      const slot = cycleSlot(now, config);
+      const id = slot.id;
+      // Date-only history occupies the first configured slot on migration.
+      // Keep its original identity and witnessed artifacts intact.
+      const previous = all.find(r => r.id === id)
+        || (hours && slot.hour === hours[0] ? all.find(r => r.id === slot.date) : null);
       if (previous) {
         if (!previous.materialized) { await materialize(previous); previous.materialized = true; await save(previous); }
         await writeAdr({ root, run: previous });
-        return { ...previous, alreadyComplete: true, runDir: runPath(id) };
+        return { ...previous, alreadyComplete: true, runDir: runPath(previous.id) };
       }
       const surface = config.surfaces[all.length % config.surfaces.length];
       const store = await memory();
@@ -161,7 +166,7 @@ export async function openLab(root, { discover = discoverPapers } = {}) {
         const discovery = await discover(config.discovery);
         const papers = rankPapers(discovery.papers, store.list(), surface);
         const recalled = await store.search(surface, { limit: 8 });
-        const priorRows = all.filter(r => r.status === 'complete').map(r => ({ date: r.id, deep: r.surface, finding: r.proposal?.hypothesis || r.lesson, evaluated: r.evaluation ? 'yes' : 'blocked', verdict: r.verdict, pr: 'NONE' }));
+        const priorRows = all.filter(r => r.status === 'complete').map(r => ({ date: runDate(r.id), deep: r.surface, finding: r.proposal?.hypothesis || r.lesson, evaluated: r.evaluation ? 'yes' : 'blocked', verdict: r.verdict, pr: 'NONE' }));
         const run = {
           schemaVersion: 1, id, status: 'preparing', started: now.toISOString(),
           deadline: new Date(now.getTime() + config.maxMinutes * 60000).toISOString(),
@@ -170,7 +175,7 @@ export async function openLab(root, { discover = discoverPapers } = {}) {
           papers, sources: discovery.sources, discoveryComplete: discovery.complete,
           memory: store.status(), recalled,
           recentLessons: store.list().filter(record => record.kind === 'experiment').slice(-7).reverse(),
-          signals: learningSignals(priorRows, { today: id }),
+          signals: learningSignals(priorRows, { today: runDate(id) }),
         };
         await mkdir(runPath(id), { recursive: true });
         await save(run);
@@ -277,7 +282,7 @@ export async function openLab(root, { discover = discoverPapers } = {}) {
     for (const item of all) {
       const itemStamp = stamp(renderReport(item), item.baseCommit);
       ledger = appendRow(ledger, {
-        date: item.id, deep: cleanCell(item.surface), finding: cleanCell(item.proposal?.hypothesis || item.lesson),
+        date: runDate(item.id), deep: cleanCell(item.surface), finding: cleanCell(item.proposal?.hypothesis || item.lesson),
         issue: 'LOCAL', pr: 'NONE', evaluated: item.evaluation ? 'yes' : 'blocked', verdict: item.verdict,
         effect: item.evaluation?.improved ? 'frozen regression: baseline fails, candidate passes' : 'no demonstrated improvement',
         witness: itemStamp.witness, priorFates: item.disposition || 'local',

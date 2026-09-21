@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { openLab, localDate, rankPapers, researchMode, validateProposal } from './core.mjs';
 import { openMemory } from './memory.mjs';
+import { parseLedger, verifyLedger } from '../../packages/ledger/dist/index.js';
 
 const paper = { id: '2609.12345', title: 'Agent memory retrieval', abstract: 'Evaluation of memory retrieval in agents.', url: 'https://arxiv.org/abs/2609.12345', published: '2026-09-19T00:00:00Z', updated: '2026-09-19T00:00:00Z', authors: ['Test fixture'], categories: ['cs.AI'] };
 test('Toronto date and seen-ID detection do not depend on UTC midnight or title spelling', () => {
@@ -29,10 +30,10 @@ test('paper hypotheses must reference the actual discovery snapshot', () => {
   assert.throws(() => validateProposal(proposal, { mode: 'paper-candidates', papers: [paper] }), /recorded discovery/);
 });
 
-async function fixture(t, discover) {
+async function fixture(t, discover, configOverrides = {}) {
   const root = await mkdtemp(join(tmpdir(), 'dream-research-controller-'));
   t.after(() => rm(root, { recursive: true, force: true }));
-  const config = { version: 1, publication: 'local-only', promotion: 'human-review', maxMinutes: 60, maxPendingCandidates: 3, timezone: 'America/Toronto', surfaces: ['memory retrieval'], discovery: { lookbackDays: 7, maxResults: 10 }, memory: { backend: 'lexical' } };
+  const config = { version: 1, publication: 'local-only', promotion: 'human-review', maxMinutes: 60, maxPendingCandidates: 3, timezone: 'America/Toronto', surfaces: ['memory retrieval'], discovery: { lookbackDays: 7, maxResults: 10 }, memory: { backend: 'lexical' }, ...configOverrides };
   await writeFile(join(root, 'research.config.json'), JSON.stringify(config));
   await writeFile(join(root, 'dream.config.json'), JSON.stringify({ repo: 'local/test', cron: '0 11 * * *', slots: [{ deep: 'memory', scan: ['evaluation'] }] }));
   execFileSync('git', ['init', '-q'], { cwd: root });
@@ -159,4 +160,105 @@ test('ADR write failure prevents successful completion and a retry repairs it', 
   await rm(adrPath, { recursive: true });
   await lab.finalize(run.id, review, true);
   assert.equal((await lab.verifyRun(run.id)).valid, true);
+});
+
+test('two scheduled cycles keep distinct evidence and lessons with calendar dates in the ledger', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-21T11:00:00Z') });
+  let requests = 0;
+  const lab = await fixture(t, async () => { requests++; return { complete: true, papers: [paper], sources: [] }; }, { dailyHours: [7, 19] });
+  const morning = await lab.prepare();
+  assert.equal(morning.id, '2026-09-21-0700');
+  await lab.finalize(morning.id, { lesson: 'Morning fixture: retain this first observation for the next scheduled experiment.' }, true);
+  const morningReport = await readFile(join(morning.runDir, 'REPORT.md'), 'utf8');
+  const morningWitness = await readFile(join(morning.runDir, 'witness.json'), 'utf8');
+  t.mock.timers.setTime(Date.parse('2026-09-21T22:59:00Z'));
+  assert.equal((await lab.prepare()).alreadyComplete, true);
+  assert.equal(requests, 1);
+
+  t.mock.timers.setTime(Date.parse('2026-09-21T23:00:00Z'));
+  const evening = await lab.prepare();
+  assert.equal(evening.id, '2026-09-21-1900');
+  assert.equal(evening.signals.lastRowDate, '2026-09-21');
+  assert.equal(evening.signals.daysSinceLastRow, 0);
+  assert.equal(evening.recentLessons[0].id, `experiment:${morning.id}`);
+  assert.match(await readFile(join(evening.runDir, 'PROMPT.md'), 'utf8'), /freeze 2026-09-21-1900/);
+  await lab.finalize(evening.id, { lesson: 'Evening fixture: preserve a separate observation without replacing the morning evidence.' }, true);
+  const eveningReport = await readFile(join(evening.runDir, 'REPORT.md'), 'utf8');
+  assert.equal((await lab.prepare()).alreadyComplete, true);
+  assert.equal(requests, 2);
+  assert.deepEqual((await lab.status()).runs.map(run => run.id), [morning.id, evening.id]);
+  assert.deepEqual(new Set((await lab.recall('')).recentLessons.map(item => item.id)), new Set([`experiment:${morning.id}`, `experiment:${evening.id}`]));
+
+  const ledger = await readFile(join(lab.root, 'reports/research/LEDGER.md'), 'utf8');
+  assert.equal(verifyLedger(ledger).ok, true);
+  assert.deepEqual(parseLedger(ledger).rows.map(row => row.date), ['2026-09-21', '2026-09-21']);
+  const index = await readFile(join(lab.root, 'docs/adrs/research/INDEX.md'), 'utf8');
+  for (const run of [morning, evening]) {
+    assert.equal(index.split('\n').filter(line => line.includes(`](ADR-${run.id}.md)`)).length, 1);
+    assert.equal((await lab.verifyRun(run.id)).valid, true);
+  }
+  await rm(join(morning.runDir, 'REPORT.md'));
+  assert.equal((await lab.repair(morning.id)).valid, true);
+  assert.equal(await readFile(join(morning.runDir, 'REPORT.md'), 'utf8'), morningReport);
+  assert.equal(await readFile(join(morning.runDir, 'witness.json'), 'utf8'), morningWitness);
+  assert.equal(await readFile(join(lab.root, 'reports/research/LATEST.md'), 'utf8'), eveningReport);
+  assert.equal((await lab.verifyRun(evening.id)).valid, true);
+});
+
+test('legacy completion occupies only the first slot after migration and preserves its original artifacts', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-21T11:00:00Z') });
+  let requests = 0;
+  const discover = async () => { requests++; return { complete: true, papers: [], sources: [] }; };
+  const legacyLab = await fixture(t, discover);
+  const legacy = await legacyLab.prepare();
+  assert.equal(legacy.id, '2026-09-21');
+  await legacyLab.finalize(legacy.id, { lesson: 'Legacy fixture: preserve this witnessed daily observation through schedule migration.' }, true);
+  const artifactPaths = [
+    join(legacy.runDir, 'run.json'), join(legacy.runDir, 'REPORT.md'), join(legacy.runDir, 'witness.json'),
+    join(legacyLab.root, 'reports/research', `${legacy.id}.md`),
+    join(legacyLab.root, 'reports/research', `${legacy.id}.witness.json`),
+    join(legacyLab.root, 'docs/adrs/research', `ADR-${legacy.id}.md`),
+  ];
+  const originals = await Promise.all(artifactPaths.map(path => readFile(path, 'utf8')));
+  await writeFile(join(legacyLab.root, 'research.config.json'), JSON.stringify({ ...legacyLab.config, dailyHours: [7, 19] }));
+  const lab = await openLab(legacyLab.root, { discover });
+  const morning = await lab.prepare();
+  assert.equal(morning.id, legacy.id);
+  assert.equal(morning.runDir, legacy.runDir);
+  assert.equal(morning.alreadyComplete, true);
+  assert.equal(requests, 1);
+
+  t.mock.timers.setTime(Date.parse('2026-09-21T23:00:00Z'));
+  const evening = await lab.prepare();
+  assert.equal(evening.id, '2026-09-21-1900');
+  await lab.finalize(evening.id, { lesson: 'Migrated evening fixture: the second slot is a separate cycle with its own lesson.' }, true);
+  assert.equal(requests, 2);
+  assert.deepEqual((await lab.status()).runs.map(run => run.id), [legacy.id, evening.id]);
+  assert.deepEqual(await Promise.all(artifactPaths.map(path => readFile(path, 'utf8'))), originals);
+  assert.equal((await lab.verifyRun(legacy.id)).valid, true);
+  assert.equal((await lab.verifyRun(evening.id)).valid, true);
+});
+
+test('an unfinished earlier slot resumes before a later slot can start', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-21T11:00:00Z') });
+  let requests = 0;
+  const lab = await fixture(t, async () => { requests++; return { complete: true, papers: [], sources: [] }; }, { dailyHours: [7, 19] });
+  const morning = await lab.prepare();
+  t.mock.timers.setTime(Date.parse('2026-09-21T23:00:00Z'));
+  const resumed = await lab.prepare();
+  assert.equal(resumed.id, morning.id);
+  assert.equal(resumed.deadline, morning.deadline);
+  assert.equal(resumed.resumed, true);
+  assert.equal(requests, 1);
+  await lab.finalize(morning.id, { lesson: 'The earlier unfinished slot exceeded its budget; retain this blocker before beginning another cycle.' }, true);
+  assert.equal((await lab.prepare()).id, '2026-09-21-1900');
+  assert.equal(requests, 2);
+});
+
+test('controller rejects malformed calendar and slot identifiers before reading run files', async t => {
+  const lab = await fixture(t, async () => ({ complete: true, papers: [], sources: [] }), { dailyHours: [7, 19] });
+  for (const id of [undefined, '../2026-09-21', '2026-02-30', '2026-09-21-2400', '2026-09-21-1960', '2026-09-21-7', '2026-09-21-0700/../other']) {
+    assert.throws(() => lab.load(id), /run.?id|YYYY-MM-DD/i);
+  }
+  await assert.rejects(fixture(t, async () => ({ complete: true, papers: [], sources: [] }), { dailyHours: [7, 7] }), /dailyHours/);
 });

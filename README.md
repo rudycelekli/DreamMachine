@@ -4,15 +4,15 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 A personal research lab that reads recent AI papers, implements one testable
-idea per day, measures it against a frozen baseline, and remembers the result.
+idea per cycle, measures it against a frozen baseline, and remembers the result.
 Built on [ruvnet/dream-machine](https://github.com/ruvnet/dream-machine) and
 [RuVector](https://github.com/ruvnet/RuVector).
 
-The objective is a useful, evidence-backed change each day. An unsuccessful
+The objective is a useful, evidence-backed change each cycle. An unsuccessful
 experiment still produces a durable lesson. No improvement or scientific
 originality is guaranteed.
 
-## Daily loop
+## Twice-daily loop
 
 1. Discover recently submitted papers and retrieve prior research lessons.
 2. Read primary sources and select one bounded, falsifiable hypothesis.
@@ -44,11 +44,13 @@ npm run research -- status
 npm run research -- prepare
 ```
 
-Follow the prepared run's `.dream/research/runs/YYYY-MM-DD/PROMPT.md`.
+Follow the returned run's `.dream/research/runs/RUN_ID/PROMPT.md`.
 `prepare` creates the research context; an AI coding agent follows that prompt
 to research, implement, evaluate, and finish the cycle.
 
-The maintainer's existing Codex schedule runs at **07:00 America/Toronto**.
+The maintainer's Codex schedule runs at **07:00 and 19:00 America/Toronto**.
+New cycle IDs include their slot, for example `2026-09-22-0700` and
+`2026-09-22-1900`, with a separate experiment, report, and ADR for each.
 It requires the local computer and Codex to be running. Cloning this repository
 does not install that schedule. GitHub Actions validates code; it does not run
 the daily AI researcher.

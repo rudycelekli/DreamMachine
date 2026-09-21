@@ -30,6 +30,7 @@ Alternatives Considered → Test Contract → References.
 | [ADR-0108](./ADR-0108-mandatory-research-cycle-adrs.md) | Always record decisions and every research cycle in ADRs | Accepted user policy |
 | [ADR-0109](./ADR-0109-public-research-repository.md) | Publish the research laboratory on GitHub | Accepted user decision |
 | [ADR-0110](./ADR-0110-deterministic-deadline-regression.md) | Make the deadline regression independent of runner speed | Accepted for CI |
+| [ADR-0111](./ADR-0111-twice-daily-research-cycles.md) | Run separate research cycles at 07:00 and 19:00 Toronto | Accepted user request |
 
 ## Daily research decisions
 

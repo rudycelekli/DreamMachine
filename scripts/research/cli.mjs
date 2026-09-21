@@ -19,7 +19,7 @@ try {
     case 'verify': result = await lab.verifyRun(id); if (!result.valid) process.exitCode = 1; break;
     case 'repair': result = await lab.repair(id); if (!result.valid) process.exitCode = 1; break;
     case 'disposition': result = await lab.disposition(id, rest[0]); break;
-    default: throw new Error('Commands: status, prepare, search <date> <arxiv-query>, recall <query>, freeze <date> <proposal.json>, evaluate <date>, finish <date> <review.json>, abandon <date> <reason>, verify <date>, repair <date>, disposition <date> reviewed|discarded');
+    default: throw new Error('Commands: status, prepare, search <run-id> <arxiv-query>, recall <query>, freeze <run-id> <proposal.json>, evaluate <run-id>, finish <run-id> <review.json>, abandon <run-id> <reason>, verify <run-id>, repair <run-id>, disposition <run-id> reviewed|discarded. Run IDs: YYYY-MM-DD-HHMM, or YYYY-MM-DD for legacy daily runs.');
   }
   console.log(JSON.stringify(result, null, 2));
 } catch (error) {

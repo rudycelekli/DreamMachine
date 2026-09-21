@@ -1,4 +1,4 @@
-# Daily research and implementation
+# Twice-daily research and implementation
 
 This checkout combines the actual [Dream Machine engine](https://github.com/ruvnet/dream-machine)
 with native [RuVector](https://github.com/ruvnet/RuVector). The daily Codex task
@@ -15,9 +15,10 @@ the generated instructions to complete the cycle.
 
 The default research target is this repository, with a rotating focus on agent
 memory, retrieval, evaluation, novelty selection and bounded reasoning.
-Configure source queries and surfaces in `research.config.json`. The daily
-schedule is a Codex heartbeat at 07:00 America/Toronto; changing `dailyHour`
-in the JSON does not reschedule the task. Change the actual scheduled task too.
+Configure source queries and surfaces in `research.config.json`. The schedule
+is one Codex heartbeat at 07:00 and 19:00 America/Toronto. `dailyHours: [7, 19]`
+selects cycle identity; changing the JSON does not reschedule the actual task.
+Keep both settings in sync. See [ADR-0111](adrs/ADR-0111-twice-daily-research-cycles.md).
 Keep the computer on and Codex running for scheduled local work.
 
 ## Run now
@@ -29,9 +30,22 @@ npm run research -- status
 npm run research -- prepare
 ```
 
-Open the returned `.dream/research/runs/YYYY-MM-DD/PROMPT.md`, `papers.json`
-and `memory.json`. Preparation resumes an unfinished run and will not create a
-second run on the same Toronto date. Each cycle has a 60-minute deadline, one
+Open the returned `.dream/research/runs/RUN_ID/PROMPT.md`, `papers.json`
+and `memory.json`. New IDs include the scheduled local slot: `YYYY-MM-DD-0700`
+or `YYYY-MM-DD-1900`. Always use the returned ID in subsequent commands.
+Preparation resumes an unfinished run before creating another, and retries of
+the same completed slot return that result. The evening slot can start a new
+cycle after the morning finishes. Before 07:00, preparation selects the previous
+day's evening slot; a delayed launch uses the latest eligible local slot and
+does not backfill missed slots. Toronto calendar arithmetic handles daylight
+saving changes without creating duplicate IDs.
+
+Historical date-only runs and their witnesses remain unchanged. A completed
+date-only run occupies the first slot of its date during migration, so enabling
+two runs does not repeat today's completed morning experiment. Configurations
+without `dailyHours` retain the original date-only behavior.
+
+Each cycle has a 60-minute deadline, one
 frozen hypothesis and one evaluation. At most three accepted candidates await
 review. A stale or blocked run must be abandoned with a specific useful lesson;
 it cannot silently vanish. If the controller process is killed, inspect
@@ -47,7 +61,7 @@ a newly released paper. This bounded source scan is not comprehensive coverage
 of all conferences or the entire research literature. The researcher must
 read primary sources and perform a web prior-art search before implementation.
 An abstract supports discovery, not a claim that the full paper was read.
-Use `npm run research -- search YYYY-MM-DD 'all:"specific topic"'` before
+Use `npm run research -- search RUN_ID 'all:"specific topic"'` before
 freezing to record additional focused arXiv discovery (four queries per cycle
 maximum). Leave at least three seconds between arXiv requests. Source totals
 and truncation are preserved so absence from the newest results is not treated
@@ -78,7 +92,7 @@ Create `proposal.json` under the run directory:
     "finding": "The closest existing method and the precise distinction, without claiming global originality.",
     "urls": ["https://arxiv.org/abs/ACTUAL_INSPECTED_ID"]
   }],
-  "validation": { "testFile": ".dream/research/runs/YYYY-MM-DD/oracle.test.mjs" }
+  "validation": { "testFile": ".dream/research/runs/RUN_ID/oracle.test.mjs" }
 }
 ```
 
@@ -93,7 +107,7 @@ network/source failure is not evidence that there is no new research and
 cannot trigger this fallback.
 
 ```sh
-npm run research -- freeze YYYY-MM-DD .dream/research/runs/YYYY-MM-DD/proposal.json
+npm run research -- freeze RUN_ID .dream/research/runs/RUN_ID/proposal.json
 ```
 
 Freeze captures the clean committed baseline, policy and oracle, then creates
@@ -106,7 +120,7 @@ new benchmark work can be proposed separately for human review.
 ## Evaluate and learn
 
 ```sh
-npm run research -- evaluate YYYY-MM-DD
+npm run research -- evaluate RUN_ID
 ```
 
 The evaluator runs the fixed configured command against both worktrees, then
@@ -133,8 +147,8 @@ source attribution, overfitting and unexpected effects. Save `review.json`:
 ```
 
 ```sh
-npm run research -- finish YYYY-MM-DD .dream/research/runs/YYYY-MM-DD/review.json
-npm run research -- verify YYYY-MM-DD
+npm run research -- finish RUN_ID .dream/research/runs/RUN_ID/review.json
+npm run research -- verify RUN_ID
 ```
 
 No improvement can be guaranteed. ACCEPT is a recommendation for review,
@@ -147,7 +161,7 @@ separately designed benchmark and budget; this first implementation's automated
 acceptance gate measures correctness. It never invents those measurements.
 
 ```sh
-npm run research -- abandon YYYY-MM-DD "The specific blocker; the exact measurement needed next."
+npm run research -- abandon RUN_ID "The specific blocker; the exact measurement needed next."
 npm run research -- recall "memory retrieval failure"
 ```
 
@@ -156,7 +170,7 @@ witness JSON and `LEDGER.md` preserve history. Raw source records, hypotheses,
 worktrees, patches and logs live in `.dream/research/`. All are local and ignored
 by Git to avoid contaminating future baseline snapshots. Back up these directories
 if the machine is replaced. No public issues, gists or PRs are created.
-The controller creates `docs/adrs/research/ADR-YYYY-MM-DD.md` during preparation
+The controller creates `docs/adrs/research/ADR-RUN_ID.md` during preparation
 and updates it through freezing, evaluation and completion. The separate
 [ADR index](adrs/research/INDEX.md) links every cycle's context, decision,
 alternatives, evidence, consequences and next steps. ACCEPT remains Proposed
@@ -164,12 +178,12 @@ pending human review; REJECT and INCONCLUSIVE receive their own explicit status.
 Missing or changed ADRs or index entries fail `verify`. Cycle ADRs and their
 index are local generated artifacts, ignored by Git so updates do not dirty the
 baseline. Back them up together with reports and `.dream/research/`.
-Use `repair YYYY-MM-DD` only to rebuild derived reports/ledger/memory after an
+Use `repair RUN_ID` only to rebuild derived reports/ledger/memory after an
 interrupted completion. It is not a way to repair modified experimental evidence.
 
 Review a successful candidate with `git diff` in its worktree or its saved
 `candidate.patch`. Merging/applying code is an explicit human decision. After
-review, `disposition YYYY-MM-DD reviewed` or `discarded` releases its pending
+review, `disposition RUN_ID reviewed` or `discarded` releases its pending
 slot; it does not apply code or delete evidence. Accepted changes do not silently
 become tomorrow's baseline; the baseline advances after an explicitly reviewed
 change reaches the target branch. Research memory advances after every cycle.

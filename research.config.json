@@ -2,7 +2,7 @@
   "version": 1,
   "name": "DreamMachine research laboratory",
   "timezone": "America/Toronto",
-  "dailyHour": 7,
+  "dailyHours": [7, 19],
   "maxMinutes": 60,
   "maxPendingCandidates": 3,
   "discovery": {

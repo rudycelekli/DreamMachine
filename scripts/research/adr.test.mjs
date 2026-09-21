@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { renderAdr, writeAdr, verifyAdr } from './adr.mjs';
 
 function run(overrides = {}) {
@@ -16,12 +17,12 @@ function run(overrides = {}) {
   };
 }
 
-function finished(root, verdict) {
-  const runDir = join(root, '.dream/research/runs/2026-09-20');
+function finished(root, verdict, id = '2026-09-20') {
+  const runDir = join(root, '.dream/research/runs', id);
   return run({
-    status: 'complete', completed: '2026-09-20T11:30:00.000Z', verdict,
+    id, status: 'complete', completed: '2026-09-20T11:30:00.000Z', verdict,
     proposal: { kind: 'paper', paperIds: ['2609.12345'], hypothesis: 'Bounded retrieval prevents a known failure.', changeSummary: 'Add a limit to the selected retrieval path.', expectedOutcome: 'The frozen oracle passes on the candidate.', rationale: 'The existing baseline fails on the measured case.', priorArt: [{ query: 'retrieval limit prior art', finding: 'A related paper uses an adjacent method.', urls: ['https://example.invalid/paper(v1)'] }] },
-    experiment: { root, branch: 'research/2026-09-20', baseCommit: 'baseline-commit', baselineDir: join(runDir, 'worktrees/baseline'), candidateDir: join(runDir, 'worktrees/candidate'), oraclePath: join(runDir, 'oracle/regression.test.mjs'), oracleSha256: 'oracle-digest', policySha256: 'frozen-policy-digest' },
+    experiment: { root, branch: `research/${id}`, baseCommit: 'baseline-commit', baselineDir: join(runDir, 'worktrees/baseline'), candidateDir: join(runDir, 'worktrees/candidate'), oraclePath: join(runDir, 'oracle/regression.test.mjs'), oracleSha256: 'oracle-digest', policySha256: 'frozen-policy-digest' },
     evaluation: { status: 'improved', improved: true, claim: 'One frozen case passes.', candidateHead: 'baseline-commit', candidateDiffSha256: 'patch-digest', patchPath: join(runDir, 'candidate.patch'), receipts: [{ path: join(runDir, 'receipts/candidate-oracle.json'), sha256: 'receipt-digest' }], checks: { candidateOracle: { passed: true, exitCode: 0, stdoutPath: join(runDir, 'receipts/candidate-oracle.stdout.log'), stdoutSha256: 'stdout-digest', stderrPath: join(runDir, 'receipts/candidate-oracle.stderr.log'), stderrSha256: 'stderr-digest' } }, errors: [], limitations: ['A single frozen regression is not a universal improvement.'] },
     review: { critic: 'independent-fixture', analysis: 'The evidence supports only the tested behavior.', concerns: [] },
     lesson: 'Measure the closest compatibility case before attempting future changes.',
@@ -123,6 +124,72 @@ test('generation is deterministic, retries replace one entry, and dates sort sta
   assert.deepEqual((await readdir(join(root, 'docs/adrs/research'))).sort(), ['ADR-2026-09-19.md', 'ADR-2026-09-20.md', 'INDEX.md']);
 });
 
+test('legacy ADR rendering and index remain byte-identical across the slot-ID extension', async t => {
+  // Captured before slot IDs were introduced: existing witnessed records must
+  // remain verifiable without regeneration or cosmetic changes.
+  const digest = value => createHash('sha256').update(value).digest('hex');
+  assert.equal(digest(renderAdr(run())), '648816e4c70a18f10d152f7c48e4d53c1ae8535023c12be303ab1744df3d55a9');
+  const recorded = {
+    ACCEPT: '5bd909ca7af9d6fe5517b86aeb2c9b496fd47607e0c605ff467586cb4646b838',
+    REJECT: 'db43e5118182ac54a73caeea873722b8ac0facc6a5d8a362c8cf2c132bf0fa1c',
+    INCONCLUSIVE: 'ceea547777ff412a2271dafdd4ab8a620a85783d086ec36da0fc62792ecf6552',
+  };
+  for (const [verdict, expected] of Object.entries(recorded)) assert.equal(digest(renderAdr(finished('/fixture', verdict))), expected);
+  const root = await fixture(t);
+  const result = await writeAdr({ root, run: run() });
+  assert.equal(await readFile(result.indexPath, 'utf8'), '# Daily research architecture decisions\n\nGenerated from the daily ADRs in this directory. The controller updates records from preparation through completion; a Proposed result still requires human review.\n\n| Cycle | Decision record | Status |\n| --- | --- | --- |\n| 2026-09-20 | [ADR-2026-09-20](ADR-2026-09-20.md) | Draft |\n');
+});
+
+test('morning, evening, and legacy cycles keep separate ADRs and stable sorted index entries', async t => {
+  const root = await fixture(t);
+  const legacy = finished(root, 'REJECT');
+  const morning = finished(root, 'ACCEPT', '2026-09-20-0700');
+  const evening = finished(root, 'INCONCLUSIVE', '2026-09-20-1900');
+  const eveningPaths = await writeAdr({ root, run: evening });
+  const legacyPaths = await writeAdr({ root, run: legacy });
+  const legacyBytes = await readFile(legacyPaths.path, 'utf8');
+  const morningPaths = await writeAdr({ root, run: morning });
+  const index = await readFile(morningPaths.indexPath, 'utf8');
+  assert.deepEqual(index.split('\n').filter(line => /^\| 2026/.test(line)), [
+    '| 2026-09-20 | [ADR-2026-09-20](ADR-2026-09-20.md) | Rejected |',
+    '| 2026-09-20-0700 | [ADR-2026-09-20-0700](ADR-2026-09-20-0700.md) | Proposed |',
+    '| 2026-09-20-1900 | [ADR-2026-09-20-1900](ADR-2026-09-20-1900.md) | Inconclusive |',
+  ]);
+  assert.notEqual(morningPaths.path, eveningPaths.path);
+  const morningBytes = await readFile(morningPaths.path, 'utf8');
+  assert.match(morningBytes, /runs\/2026-09-20-0700\/receipts\/candidate-oracle\.json/);
+  assert.match(morningBytes, /reports\/research\/2026-09-20-0700\.witness\.json/);
+  await writeAdr({ root, run: evening });
+  assert.equal(await readFile(legacyPaths.path, 'utf8'), legacyBytes);
+  assert.equal(await readFile(morningPaths.path, 'utf8'), morningBytes);
+  assert.equal(await readFile(morningPaths.indexPath, 'utf8'), index);
+  for (const record of [legacy, morning, evening]) assert.deepEqual(await verifyAdr({ root, run: record }), { valid: true, errors: [] });
+});
+
+test('slot ADR verification detects missing, tampered, and swapped morning/evening index entries', async t => {
+  const root = await fixture(t);
+  const morning = run({ id: '2026-09-20-0700' });
+  const evening = run({ id: '2026-09-20-1900' });
+  const morningPaths = await writeAdr({ root, run: morning });
+  const eveningPaths = await writeAdr({ root, run: evening });
+  await writeFile(eveningPaths.path, renderAdr(evening).replace('baseline-commit', 'altered-commit'));
+  assert.equal((await verifyAdr({ root, run: evening })).valid, false);
+  assert.equal((await verifyAdr({ root, run: morning })).valid, true);
+  await writeAdr({ root, run: evening });
+  const index = await readFile(eveningPaths.indexPath, 'utf8');
+  const row = index.split('\n').find(line => line.startsWith('| 2026-09-20-1900 |'));
+  for (const damaged of [index.replace(`${row}\n`, ''), index.replace('(ADR-2026-09-20-1900.md)', '(ADR-2026-09-20-0700.md)'), `${index}${row}\n`]) {
+    await writeFile(eveningPaths.indexPath, damaged);
+    assert.equal((await verifyAdr({ root, run: evening })).valid, false);
+  }
+  await writeAdr({ root, run: evening });
+  await rm(morningPaths.path);
+  assert.equal((await verifyAdr({ root, run: morning })).valid, false);
+  await writeAdr({ root, run: morning });
+  assert.deepEqual(await verifyAdr({ root, run: morning }), { valid: true, errors: [] });
+  assert.deepEqual(await verifyAdr({ root, run: evening }), { valid: true, errors: [] });
+});
+
 test('verification detects missing and tampered ADRs and missing, altered, or duplicate index entries', async t => {
   const root = await fixture(t);
   const record = finished(root, 'ACCEPT');
@@ -174,6 +241,6 @@ test('source data is escaped and cannot create active HTML or unsupported links'
 
 test('unsafe run ids and unsupported completed verdicts fail before creating paths', async t => {
   const root = await fixture(t);
-  for (const id of ['../escape', '2026-02-30', '2026-09-20/other']) await assert.rejects(writeAdr({ root, run: run({ id }) }), /valid YYYY-MM-DD/);
+  for (const id of ['../escape', '2026-02-30', '2026-09-20/other', '2026-02-30-0700', '2026-09-20-2400', '2026-09-20-1960', '2026-09-20-700', '2026-09-20-0700/other', '2026-09-20-0700\\other']) await assert.rejects(writeAdr({ root, run: run({ id }) }), /YYYY-MM-DD/);
   for (const verdict of ['ACCEPTED', '__proto__', 'toString']) assert.throws(() => renderAdr(run({ status: 'complete', verdict })), /completed ADR requires/);
 });

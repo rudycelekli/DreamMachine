@@ -1,22 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { assertRunId, isRunId } from './schedule.mjs';
 
 const DIRECTORY = 'docs/adrs/research';
 const MARKER = '<!-- dream-machine-research-adr: ';
 const STATUSES = ['Draft', 'Proposed', 'Rejected', 'Inconclusive'];
-const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const text = value => String(value ?? '').replace(/\r\n?/g, '\n').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/[\\`*_\[\]{}|#]/g, '\\$&');
 const line = value => text(value).replace(/\n/g, ' ');
 const quote = value => text(value).split('\n').map(part => `> ${part}`).join('\n');
 const filename = id => `ADR-${id}.md`;
 
-function validateId(id) {
-  if (typeof id !== 'string' || !datePattern.test(id) || Number.isNaN(Date.parse(`${id}T00:00:00.000Z`)) || new Date(`${id}T00:00:00.000Z`).toISOString().slice(0, 10) !== id) throw new Error('ADR run id must be a valid YYYY-MM-DD date.');
-}
-
 function status(run) {
-  validateId(run.id);
+  assertRunId(run.id);
   if (run.status !== 'complete') return 'Draft';
   const result = { ACCEPT: 'Proposed', REJECT: 'Rejected', INCONCLUSIVE: 'Inconclusive' }[run.verdict];
   if (!STATUSES.includes(result)) throw new Error('A completed ADR requires an ACCEPT, REJECT, or INCONCLUSIVE verdict.');
@@ -115,12 +111,14 @@ async function atomic(path, content) {
 const indexEntry = (id, adrStatus) => `| ${id} | [ADR-${id}](${filename(id)}) | ${adrStatus} |`;
 async function renderIndex(directory) {
   const rows = [];
-  for (const name of (await readdir(directory)).filter(name => /^ADR-\d{4}-\d{2}-\d{2}\.md$/.test(name)).sort()) {
+  const ids = (await readdir(directory)).filter(name => name.startsWith('ADR-') && name.endsWith('.md') && isRunId(name.slice(4, -3))).map(name => name.slice(4, -3)).sort();
+  for (const id of ids) {
+    const name = filename(id);
     const content = await readFile(join(directory, name), 'utf8');
     const first = content.split('\n', 1)[0];
     if (!first.startsWith(MARKER) || !first.endsWith(' -->')) throw new Error(`Unrecognized generated ADR metadata: ${name}`);
     const metadata = JSON.parse(first.slice(MARKER.length, -4));
-    validateId(metadata.id);
+    assertRunId(metadata.id);
     if (filename(metadata.id) !== name || !STATUSES.includes(metadata.status)) throw new Error(`Invalid generated ADR metadata: ${name}`);
     rows.push(indexEntry(metadata.id, metadata.status));
   }

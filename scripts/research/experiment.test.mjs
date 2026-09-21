@@ -195,16 +195,21 @@ test('timed-out regression processes are killed and cannot create passing eviden
 
 test('the overall frozen deadline prevents launching additional checks', async (t) => {
   const f = await fixture(t);
-  // A very short total budget expires during worktree setup, independently of
-  // the longer per-process timeout. No sleeps or additional process are needed.
-  f.config.maxMinutes = 0.001;
+  // Freeze with a valid future deadline, then advance only the clock. Worktree
+  // setup speed must not decide whether any checks launch; frozen metadata stays intact.
+  t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 8, 21) });
+  f.config.maxMinutes = 1;
   const experiment = await f.freeze();
   await candidate(experiment, 2);
+  t.mock.timers.setTime(Date.parse(experiment.deadline) + 1);
   const evaluation = await evaluateExperiment({ ...f, experiment });
   assert.equal(evaluation.status, 'inconclusive');
   assert.match(evaluation.errors.join('\n'), /deadline reached/);
   assert.equal(evaluation.checks.baselineRegression, null);
+  assert.equal(evaluation.checks.baselineOracle, null);
+  assert.equal(evaluation.checks.candidateRegression, null);
   assert.equal(evaluation.checks.candidateOracle, null);
+  assert.deepEqual(evaluation.receipts, []);
   assert.deepEqual(await verifyExperiment({ ...f, experiment, evaluation }), { valid: true, errors: [] });
 });
 

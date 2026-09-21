@@ -29,6 +29,7 @@ Alternatives Considered → Test Contract → References.
 | [ADR-0107](./ADR-0107-ruos-evaluation-boundary.md) | Independent ruOS evaluation boundary | Implemented for compiler and receipt contract; external controllers required |
 | [ADR-0108](./ADR-0108-mandatory-research-cycle-adrs.md) | Always record decisions and every research cycle in ADRs | Accepted user policy |
 | [ADR-0109](./ADR-0109-public-research-repository.md) | Publish the research laboratory on GitHub | Accepted user decision |
+| [ADR-0110](./ADR-0110-deterministic-deadline-regression.md) | Make the deadline regression independent of runner speed | Accepted for CI |
 
 ## Daily research decisions
 

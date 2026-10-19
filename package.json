@@ -53,6 +53,6 @@
     "fast-xml-parser": "5.11.1"
   },
   "optionalDependencies": {
-    "@ruvector/core": "0.1.32"
+    "@ruvector/core": "0.1.33"
   }
 }
